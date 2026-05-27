@@ -1,0 +1,161 @@
+@page "/"
+@using Italbytz.Math.Geometry
+
+<div class="calc-card">
+    <h1>Rechtwinkliges Dreieck</h1>
+    <p class="calc-lead">Zwei Seiten eingeben – die dritte wird berechnet.</p>
+
+    <div class="formula-row">
+        <span class="formula-chip">a²</span>
+        <span>+</span>
+        <span class="formula-chip">b²</span>
+        <span>=</span>
+        <span class="formula-chip">c²</span>
+    </div>
+
+    <figure class="triangle-figure" aria-label="Rechtwinkliges Dreieck: Kathete a, Kathete b, Hypotenuse c">
+        <svg class="triangle-svg" viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="30,170 210,170 210,50" fill="rgba(34,85,204,0.07)" stroke="#2255cc" stroke-width="2"/>
+            <!-- right-angle marker -->
+            <polyline points="210,170 210,155 195,155" stroke="#2255cc" stroke-width="1.5"/>
+            <!-- side labels -->
+            <text x="120" y="190" text-anchor="middle" font-size="16" font-style="italic" fill="#2255cc" font-family="Avenir Next, Segoe UI, sans-serif">a</text>
+            <text x="222" y="118" text-anchor="start"  font-size="16" font-style="italic" fill="#2255cc" font-family="Avenir Next, Segoe UI, sans-serif">b</text>
+            <text x="108" y="102" text-anchor="middle" font-size="16" font-style="italic" fill="#1d5037" font-family="Avenir Next, Segoe UI, sans-serif">c</text>
+            <!-- small square labels-->
+            <text x="120" y="165" text-anchor="middle" font-size="10" fill="#7080a0" font-family="Avenir Next, Segoe UI, sans-serif">(Kathete)</text>
+            <text x="230" y="113" text-anchor="start"  font-size="10" fill="#7080a0" font-family="Avenir Next, Segoe UI, sans-serif">(Kathete)</text>
+            <text x="104" y="115" text-anchor="middle" font-size="10" fill="#7080a0" font-family="Avenir Next, Segoe UI, sans-serif">(Hypotenuse)</text>
+        </svg>
+    </figure>
+
+    <div class="sides-grid">
+        <div class="side-field">
+            <label><span>a</span> <small>Kathete</small></label>
+            <input type="number" min="0" step="any"
+                   class="@(_computed == "a" ? "is-computed" : "")"
+                   @bind="_inputA" @bind:event="oninput"
+                   placeholder="unbekannt" />
+        </div>
+        <div class="side-field">
+            <label><span>b</span> <small>Kathete</small></label>
+            <input type="number" min="0" step="any"
+                   class="@(_computed == "b" ? "is-computed" : "")"
+                   @bind="_inputB" @bind:event="oninput"
+                   placeholder="unbekannt" />
+        </div>
+        <div class="side-field">
+            <label><span>c</span> <small>Hypotenuse</small></label>
+            <input type="number" min="0" step="any"
+                   class="@(_computed == "c" ? "is-computed" : "")"
+                   @bind="_inputC" @bind:event="oninput"
+                   placeholder="unbekannt" />
+        </div>
+    </div>
+
+    <div class="actions">
+        <button class="btn-primary" @onclick="Calculate" disabled="@(!CanCalculate)">Berechnen</button>
+        <button class="btn-ghost"   @onclick="Reset">Zurücksetzen</button>
+    </div>
+
+    @if (_message is not null)
+    {
+        <div class="result-box @(_isOk ? "ok" : "err")">@((MarkupString)_message)</div>
+    }
+</div>
+
+@code {
+    private string? _inputA;
+    private string? _inputB;
+    private string? _inputC;
+
+    private string? _message;
+    private bool    _isOk;
+    private string? _computed; // which field was last computed
+
+    private int KnownCount =>
+        (TryParse(_inputA, out _) ? 1 : 0) +
+        (TryParse(_inputB, out _) ? 1 : 0) +
+        (TryParse(_inputC, out _) ? 1 : 0);
+
+    private bool CanCalculate => KnownCount >= 2;
+
+    private static bool TryParse(string? s, out double v) =>
+        double.TryParse(s, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out v) && v > 0;
+
+    private void Calculate()
+    {
+        _message  = null;
+        _computed = null;
+
+        bool hasA = TryParse(_inputA, out double a);
+        bool hasB = TryParse(_inputB, out double b);
+        bool hasC = TryParse(_inputC, out double c);
+
+        try
+        {
+            if (hasA && hasB && hasC)
+            {
+                // All three given – verify
+                var t = new RightTriangle(a, b, c);
+                if (t.Verify())
+                {
+                    _isOk   = true;
+                    _message = $"<strong>✓ Gültig.</strong> {FormatSides(a, b, c)}";
+                }
+                else
+                {
+                    _isOk   = false;
+                    _message = $"<strong>✗ Kein rechtwinkliges Dreieck.</strong> " +
+                               $"a²+b² = {a*a + b*b:G6} ≠ c² = {c*c:G6}";
+                }
+            }
+            else if (hasA && hasB)
+            {
+                var t = RightTriangle.FromLegs(a, b);
+                _inputC  = Format(t.C);
+                _computed = "c";
+                _isOk   = true;
+                _message = $"<strong>c = {Format(t.C)}</strong> &nbsp;({FormatSides(t.A, t.B, t.C)})";
+            }
+            else if (hasA && hasC)
+            {
+                var t = RightTriangle.FromLegAndHypotenuse(a, c, legIsA: true);
+                _inputB  = Format(t.B);
+                _computed = "b";
+                _isOk   = true;
+                _message = $"<strong>b = {Format(t.B)}</strong> &nbsp;({FormatSides(t.A, t.B, t.C)})";
+            }
+            else if (hasB && hasC)
+            {
+                var t = RightTriangle.FromLegAndHypotenuse(b, c, legIsA: false);
+                _inputA  = Format(t.A);
+                _computed = "a";
+                _isOk   = true;
+                _message = $"<strong>a = {Format(t.A)}</strong> &nbsp;({FormatSides(t.A, t.B, t.C)})";
+            }
+        }
+        catch (Exception ex)
+        {
+            _isOk   = false;
+            _message = $"<strong>Fehler:</strong> {ex.Message}";
+        }
+    }
+
+    private void Reset()
+    {
+        _inputA   = null;
+        _inputB   = null;
+        _inputC   = null;
+        _message  = null;
+        _computed = null;
+    }
+
+    private static string Format(double v) =>
+        v == System.Math.Floor(v) ? v.ToString("0") : v.ToString("G6",
+            System.Globalization.CultureInfo.InvariantCulture);
+
+    private static string FormatSides(double a, double b, double c) =>
+        $"a = {Format(a)}, b = {Format(b)}, c = {Format(c)}";
+}
