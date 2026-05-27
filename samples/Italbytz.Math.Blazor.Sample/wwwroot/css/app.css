@@ -1,0 +1,260 @@
+:root {
+    color-scheme: light;
+    --canvas: #f4f7fb;
+    --canvas-deep: #e8eef6;
+    --surface: rgba(255, 255, 255, 0.96);
+    --ink-strong: #1a2233;
+    --ink-soft: #3a4560;
+    --ink-muted: #7080a0;
+    --accent: #2255cc;
+    --accent-light: #dce8ff;
+    --ok: #1d6b3a;
+    --ok-light: #d4f0e0;
+    --err: #b02020;
+    --err-light: #fde8e8;
+}
+
+html, body {
+    margin: 0;
+    min-height: 100%;
+    background: linear-gradient(160deg, var(--canvas), var(--canvas-deep));
+    font: 400 16px/1.6 "Avenir Next", "Segoe UI", sans-serif;
+    color: var(--ink-soft);
+    -webkit-font-smoothing: antialiased;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+.boot-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    color: var(--ink-muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+}
+
+.shell {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 0 1.25rem 4rem;
+}
+
+/* ── Header ── */
+.masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 2rem 0 1.5rem;
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.eyebrow {
+    margin: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+}
+
+.brand {
+    margin: 0.2rem 0 0;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--ink-strong);
+}
+
+.subtitle {
+    margin: 0.25rem 0 0;
+    font-size: 0.88rem;
+    color: var(--ink-muted);
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.ghost-link {
+    display: inline-block;
+    padding: 0.4rem 0.9rem;
+    border: 1.5px solid var(--accent);
+    border-radius: 6px;
+    color: var(--accent);
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: background 0.15s;
+}
+.ghost-link:hover { background: var(--accent-light); }
+
+/* ── Calculator card ── */
+.calc-card {
+    background: var(--surface);
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 14px;
+    padding: 2rem;
+    margin-top: 2rem;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+
+.calc-card h1 {
+    margin: 0 0 0.25rem;
+    font-size: 1.25rem;
+    color: var(--ink-strong);
+}
+
+.calc-lead {
+    margin: 0 0 1.75rem;
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+}
+
+/* ── Triangle SVG ── */
+.triangle-figure {
+    display: flex;
+    justify-content: center;
+    margin: 0 0 2rem;
+}
+
+.triangle-svg {
+    width: min(320px, 100%);
+    height: auto;
+}
+
+/* ── Inputs ── */
+.sides-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 480px) {
+    .sides-grid { grid-template-columns: 1fr; }
+}
+
+.side-field label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--ink-muted);
+    margin-bottom: 0.35rem;
+}
+
+.side-field label span {
+    font-style: italic;
+    font-size: 1rem;
+    color: var(--ink-strong);
+}
+
+.side-field label small {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 0.75rem;
+}
+
+.side-field input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1.5px solid rgba(0,0,0,0.15);
+    border-radius: 8px;
+    font-size: 1rem;
+    color: var(--ink-strong);
+    background: white;
+    transition: border-color 0.15s;
+    appearance: textfield;
+}
+.side-field input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.side-field input.is-computed {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    font-weight: 700;
+}
+
+/* ── Buttons ── */
+.actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.btn-primary {
+    padding: 0.6rem 1.4rem;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+
+.btn-ghost {
+    padding: 0.6rem 1.2rem;
+    background: transparent;
+    color: var(--ink-soft);
+    border: 1.5px solid rgba(0,0,0,0.15);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+.btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── Result ── */
+.result-box {
+    padding: 1rem 1.25rem;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+}
+
+.result-box.ok {
+    background: var(--ok-light);
+    color: var(--ok);
+    border: 1px solid rgba(29,107,58,0.2);
+}
+
+.result-box.err {
+    background: var(--err-light);
+    color: var(--err);
+    border: 1px solid rgba(176,32,32,0.2);
+}
+
+.result-box strong { font-weight: 700; }
+
+/* ── Formula ── */
+.formula-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+    font-size: 1.05rem;
+    flex-wrap: wrap;
+}
+
+.formula-chip {
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 0.2rem 0.6rem;
+    font-weight: 700;
+    font-style: italic;
+    font-size: 1rem;
+}
