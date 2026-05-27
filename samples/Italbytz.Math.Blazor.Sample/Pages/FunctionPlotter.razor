@@ -1,0 +1,222 @@
+@page "/plotter"
+@using Italbytz.Math.Algebra
+@using System.Globalization
+
+<div class="calc-card">
+    <h1>Funktionsplotter</h1>
+    <p class="calc-lead">Wähle einen Funktionstyp, passe die Parameter an und sieh den Graphen sofort.</p>
+
+    <!-- Function type selector -->
+    <div class="type-row">
+        <button class="type-btn @(_type == FnType.Linear    ? "active" : "")" @onclick='() => SetType(FnType.Linear)'>Linear</button>
+        <button class="type-btn @(_type == FnType.Quadratic ? "active" : "")" @onclick='() => SetType(FnType.Quadratic)'>Quadratisch</button>
+        <button class="type-btn @(_type == FnType.Cubic     ? "active" : "")" @onclick='() => SetType(FnType.Cubic)'>Kubisch</button>
+    </div>
+
+    <!-- Parameter inputs -->
+    <div class="param-grid">
+        @if (_type >= FnType.Cubic)
+        {
+            <div class="param-field">
+                <label>a (x³) <span class="pval">@Fmt(_a)</span></label>
+                <input type="range" min="-5" max="5" step="0.1" value="@_a.ToString(CultureInfo.InvariantCulture)" @oninput="e => { _a = ParseSlider(e); Update(); }" />
+            </div>
+        }
+        @if (_type >= FnType.Quadratic)
+        {
+            <div class="param-field">
+                <label>@(_type == FnType.Quadratic ? "a" : "b") (x²) <span class="pval">@Fmt(_b)</span></label>
+                <input type="range" min="-5" max="5" step="0.1" value="@_b.ToString(CultureInfo.InvariantCulture)" @oninput="e => { _b = ParseSlider(e); Update(); }" />
+            </div>
+        }
+        <div class="param-field">
+            <label>@LinearSlopeLabel (x) <span class="pval">@Fmt(_c)</span></label>
+            <input type="range" min="-10" max="10" step="0.1" value="@_c.ToString(CultureInfo.InvariantCulture)" @oninput="e => { _c = ParseSlider(e); Update(); }" />
+        </div>
+        <div class="param-field">
+            <label>@LinearConstLabel (Konstante) <span class="pval">@Fmt(_d)</span></label>
+            <input type="range" min="-10" max="10" step="0.1" value="@_d.ToString(CultureInfo.InvariantCulture)" @oninput="e => { _d = ParseSlider(e); Update(); }" />
+        </div>
+    </div>
+
+    <!-- Formula display -->
+    <div class="formula-row">
+        <span>y =</span>
+        <span class="formula-chip">@_polynomial?.Label</span>
+    </div>
+
+    <!-- SVG graph -->
+    <div class="graph-wrap">
+        @((MarkupString)BuildSvg())
+    </div>
+
+    <!-- x-range control -->
+    <div class="range-row">
+        <label>x-Bereich: −@_xMax … @_xMax</label>
+        <input type="range" min="2" max="20" step="1" value="@_xMax" @oninput="e => { _xMax = int.Parse(e.Value!.ToString()!); Update(); }" />
+    </div>
+
+    @if (_info is not null)
+    {
+        <div class="result-box ok" style="margin-top:1rem">@((MarkupString)_info)</div>
+    }
+</div>
+
+@code {
+    private enum FnType { Linear, Quadratic, Cubic }
+
+    private FnType   _type       = FnType.Quadratic;
+    private double   _a          = 1;   // x³ coefficient
+    private double   _b          = 0;   // x² coefficient
+    private double   _c          = 0;   // x  coefficient
+    private double   _d          = 0;   // constant
+    private int      _xMax       = 10;
+    private double   _yMax       = 10;
+    private string?  _polyline;
+    private string?  _info;
+    private Polynomial? _polynomial;
+
+    private string LinearSlopeLabel => _type == FnType.Linear ? "m" : _type == FnType.Quadratic ? "b" : "c";
+    private string LinearConstLabel => _type == FnType.Linear ? "n" : _type == FnType.Quadratic ? "c" : "d";
+
+    protected override void OnInitialized() => Update();
+
+    private void SetType(FnType t) { _type = t; Update(); }
+
+    private void Update()
+    {
+        _polynomial = BuildPolynomial();
+        _polyline   = ComputePolyline();
+        _info       = ComputeInfo();
+    }
+
+    private Polynomial BuildPolynomial() => _type switch
+    {
+        FnType.Linear    => new Polynomial(_d, _c),
+        FnType.Quadratic => new Polynomial(_d, _c, _b),
+        FnType.Cubic     => new Polynomial(_d, _c, _b, _a),
+        _                => new Polynomial(0)
+    };
+
+    private string ComputePolyline()
+    {
+        if (_polynomial is null) return "";
+        const int steps = 400;
+        double xMin = -_xMax, xMax = _xMax;
+        var parts = new List<string>();
+        double? prevY = null;
+
+        for (int i = 0; i <= steps; i++)
+        {
+            double x = xMin + (xMax - xMin) * i / steps;
+            double y = _polynomial.Evaluate(x);
+
+            if (double.IsNaN(y) || double.IsInfinity(y)) { prevY = null; continue; }
+
+            // Clip large jumps (discontinuities) — polyline segment break
+            if (prevY.HasValue && global::System.Math.Abs(y - prevY.Value) > _yMax * 4)
+            {
+                parts.Add(" "); // will be treated as gap — SVG ignores it gracefully
+                prevY = null;
+                continue;
+            }
+
+            double sx = ToSvgX(x);
+            double sy = ToSvgY(y);
+            parts.Add($"{sx.ToString("F1", CultureInfo.InvariantCulture)},{sy.ToString("F1", CultureInfo.InvariantCulture)}");
+            prevY = y;
+        }
+        return string.Join(" ", parts);
+    }
+
+    private string? ComputeInfo()
+    {
+        if (_polynomial is null) return null;
+        double yIntercept = _polynomial.Evaluate(0);
+        string info = $"y-Achsenabschnitt: <strong>{Fmt(yIntercept)}</strong>";
+
+        if (_type == FnType.Quadratic)
+        {
+            // ax² + bx + c — discriminant
+            double qa = _b, qb = _c, qc = _d;
+            double disc = qb * qb - 4 * qa * qc;
+            if (qa == 0) return info;
+            if (disc > 0)
+            {
+                double x1 = (-qb + global::System.Math.Sqrt(disc)) / (2 * qa);
+                double x2 = (-qb - global::System.Math.Sqrt(disc)) / (2 * qa);
+                info += $" &nbsp;|&nbsp; Nullstellen: x₁ = <strong>{Fmt(x1)}</strong>, x₂ = <strong>{Fmt(x2)}</strong>";
+            }
+            else if (disc == 0)
+            {
+                double x0 = -qb / (2 * qa);
+                info += $" &nbsp;|&nbsp; Doppelte Nullstelle: x = <strong>{Fmt(x0)}</strong>";
+            }
+            else
+            {
+                info += " &nbsp;|&nbsp; Keine reellen Nullstellen (D < 0)";
+            }
+            double xv = -qb / (2 * qa);
+            double yv = _polynomial.Evaluate(xv);
+            info += $" &nbsp;|&nbsp; Scheitel: (<strong>{Fmt(xv)}</strong>, <strong>{Fmt(yv)}</strong>)";
+        }
+        else if (_type == FnType.Linear && _c != 0)
+        {
+            double x0 = -_d / _c;
+            info += $" &nbsp;|&nbsp; Nullstelle: x = <strong>{Fmt(x0)}</strong>";
+        }
+        return info;
+    }
+
+    // SVG coordinate mapping
+    private const double SvgW = 500, SvgH = 340, PadX = 30, PadY = 20;
+    private double ToSvgX(double x) => PadX + (x + _xMax) / (2.0 * _xMax) * (SvgW - 2 * PadX);
+    private double ToSvgY(double y) => SvgH - PadY - (y + _yMax) / (2.0 * _yMax) * (SvgH - 2 * PadY);
+
+    private static string Px(double v) => v.ToString("F1", CultureInfo.InvariantCulture);
+    private static string Fmt(double v) => v == global::System.Math.Floor(v) && global::System.Math.Abs(v) < 1e6
+        ? ((long)v).ToString()
+        : v.ToString("G4", CultureInfo.InvariantCulture);
+
+    private static double ParseSlider(Microsoft.AspNetCore.Components.ChangeEventArgs e) =>
+        double.TryParse(e.Value?.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out double v) ? v : 0;
+
+    private string BuildSvg()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append("<svg class=\"graph-svg\" viewBox=\"0 0 500 340\" xmlns=\"http://www.w3.org/2000/svg\">");
+
+        // Vertical grid lines + x-labels
+        for (int gx = -_xMax; gx <= _xMax; gx++)
+        {
+            double sx = ToSvgX(gx);
+            sb.Append($"<line x1=\"{Px(sx)}\" y1=\"0\" x2=\"{Px(sx)}\" y2=\"340\" stroke=\"rgba(0,0,0,0.07)\" stroke-width=\"1\"/>");
+            if (gx != 0)
+                sb.Append($"<text x=\"{Px(sx)}\" y=\"{Px(ToSvgY(0) + 14)}\" text-anchor=\"middle\" font-size=\"9\" fill=\"#aab\" font-family=\"sans-serif\">{gx}</text>");
+        }
+        // Horizontal grid lines + y-labels
+        for (int gy = -(int)_yMax; gy <= (int)_yMax; gy++)
+        {
+            double sy = ToSvgY(gy);
+            sb.Append($"<line x1=\"0\" y1=\"{Px(sy)}\" x2=\"500\" y2=\"{Px(sy)}\" stroke=\"rgba(0,0,0,0.07)\" stroke-width=\"1\"/>");
+            if (gy != 0)
+                sb.Append($"<text x=\"{Px(ToSvgX(0) - 6)}\" y=\"{Px(sy + 3.5)}\" text-anchor=\"end\" font-size=\"9\" fill=\"#aab\" font-family=\"sans-serif\">{gy}</text>");
+        }
+        // Axes
+        sb.Append($"<line x1=\"{Px(ToSvgX(-_xMax))}\" y1=\"{Px(ToSvgY(0))}\" x2=\"{Px(ToSvgX(_xMax))}\" y2=\"{Px(ToSvgY(0))}\" stroke=\"#8090b0\" stroke-width=\"1.5\"/>");
+        sb.Append($"<line x1=\"{Px(ToSvgX(0))}\" y1=\"0\" x2=\"{Px(ToSvgX(0))}\" y2=\"340\" stroke=\"#8090b0\" stroke-width=\"1.5\"/>");
+        // Arrows
+        sb.Append($"<polygon points=\"{Px(ToSvgX(_xMax))},{Px(ToSvgY(0))} {Px(ToSvgX(_xMax) - 8)},{Px(ToSvgY(0) - 4)} {Px(ToSvgX(_xMax) - 8)},{Px(ToSvgY(0) + 4)}\" fill=\"#8090b0\"/>");
+        sb.Append($"<polygon points=\"{Px(ToSvgX(0))},4 {Px(ToSvgX(0) - 4)},12 {Px(ToSvgX(0) + 4)},12\" fill=\"#8090b0\"/>");
+        // Axis labels
+        sb.Append($"<text x=\"{Px(ToSvgX(_xMax) - 6)}\" y=\"{Px(ToSvgY(0) - 8)}\" font-size=\"12\" fill=\"#8090b0\" font-family=\"sans-serif\" font-style=\"italic\">x</text>");
+        sb.Append($"<text x=\"{Px(ToSvgX(0) + 8)}\" y=\"18\" font-size=\"12\" fill=\"#8090b0\" font-family=\"sans-serif\" font-style=\"italic\">y</text>");
+        sb.Append($"<text x=\"{Px(ToSvgX(0) + 5)}\" y=\"{Px(ToSvgY(0) + 14)}\" font-size=\"9\" fill=\"#aab\" font-family=\"sans-serif\">0</text>");
+        // Curve
+        if (_polyline is not null)
+            sb.Append($"<polyline points=\"{_polyline}\" fill=\"none\" stroke=\"#2255cc\" stroke-width=\"2.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"/>");
+
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+}
